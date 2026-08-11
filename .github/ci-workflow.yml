@@ -1,0 +1,52 @@
+# GitHub Actions CI for Business OS.
+#
+# NOTE: This file lives outside `.github/workflows/` because the GitHub App
+# token used in this workspace lacks the `workflows` permission. To activate
+# CI, copy this file to `.github/workflows/ci.yml` (via a token/user with the
+# `workflows` scope) and commit it:
+#
+#   mkdir -p .github/workflows && cp .github/ci-workflow.yml .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main, "arena/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Prettier
+        run: npm run format:check
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          # Placeholder values so the build can complete in CI.
+          # Real values live in the Vercel project settings.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_APP_URL: http://localhost:3000

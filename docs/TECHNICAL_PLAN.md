@@ -1,7 +1,23 @@
 # Business OS — Technical Plan
 
-> **Status:** DRAFT — awaiting approval. No implementation has started.
+> **Status:** ✅ APPROVED (2026-08-11) — implementation started with Phase 0 + Phase 1.
 > **Last updated:** 2026-08-11
+
+## Approval decisions log
+
+Confirmed by the product owner on approval:
+
+1. Keep Next.js + Supabase + Tailwind + shadcn/ui architecture.
+2. One business per user for the MVP.
+3. Schema stays team-ready for future expansion.
+4. Sales and Invoices remain separate modules.
+5. Inventory deduction is tied to Sales, not Invoices.
+6. MVP profit/loss reporting is simple and cash-basis.
+7. **No Stripe billing yet** — added after the core MVP is stable.
+8. PDF invoice export stays post-MVP.
+9. Simplicity for small-business owners beats advanced accounting features.
+
+---
 
 Business OS is a simple business management platform for small businesses: one place to
 track sales, products & inventory, customers, expenses, and invoices, with an automatic
@@ -38,17 +54,17 @@ profit/loss report and a dashboard that answers "how is my business doing?" at a
 
 ### 1.1 Stack
 
-| Concern          | Choice                                                        | Why                                                                                   |
-| ---------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Framework        | **Next.js 16** (App Router, React Server Components, Turbopack) | Active LTS (Oct 2025). Server-first model fits a data-heavy CRUD app perfectly.        |
-| Language         | **TypeScript** (strict mode)                                   | Money and inventory data demand type safety.                                           |
-| Styling          | **Tailwind CSS v4** + **shadcn/ui**                            | Fast to build a clean, consistent UI; accessible primitives out of the box.           |
-| Database         | **Supabase (Postgres 15+)**                                    | Managed Postgres with Row Level Security = multi-tenant safety by default.             |
-| Auth             | **Supabase Auth** (email/password, magic link, Google OAuth)   | Free tier, session handling built into the SDK, no separate auth service.              |
-| File storage     | **Supabase Storage**                                           | Expense receipts, business logo; RLS policies apply to files too.                      |
-| Validation       | **Zod**                                                        | One schema language for forms, Server Actions, and (later) API routes.                 |
-| Deployment       | **Vercel**                                                     | Zero-config Next.js deploys, preview URLs per PR, edge middleware.                     |
-| Payments (later) | **Stripe**                                                     | Checkout + Billing Portal means we write almost no billing UI.                         |
+| Concern          | Choice                                                          | Why                                                                             |
+| ---------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Framework        | **Next.js 16** (App Router, React Server Components, Turbopack) | Active LTS (Oct 2025). Server-first model fits a data-heavy CRUD app perfectly. |
+| Language         | **TypeScript** (strict mode)                                    | Money and inventory data demand type safety.                                    |
+| Styling          | **Tailwind CSS v4** + **shadcn/ui**                             | Fast to build a clean, consistent UI; accessible primitives out of the box.     |
+| Database         | **Supabase (Postgres 15+)**                                     | Managed Postgres with Row Level Security = multi-tenant safety by default.      |
+| Auth             | **Supabase Auth** (email/password, magic link, Google OAuth)    | Free tier, session handling built into the SDK, no separate auth service.       |
+| File storage     | **Supabase Storage**                                            | Expense receipts, business logo; RLS policies apply to files too.               |
+| Validation       | **Zod**                                                         | One schema language for forms, Server Actions, and (later) API routes.          |
+| Deployment       | **Vercel**                                                      | Zero-config Next.js deploys, preview URLs per PR, edge middleware.              |
+| Payments (later) | **Stripe**                                                      | Checkout + Billing Portal means we write almost no billing UI.                  |
 
 ### 1.2 High-level diagram
 
@@ -78,7 +94,7 @@ profit/loss report and a dashboard that answers "how is my business doing?" at a
 ### 1.3 Data-flow rules
 
 - **Reads** happen in Server Components via a small data-access layer (`lib/server/`).
-  The Supabase client used there carries the *signed-in user's* session, so RLS applies.
+  The Supabase client used there carries the _signed-in user's_ session, so RLS applies.
 - **Writes** happen in **Server Actions** ("use server"), each validated with Zod,
   always scoped to the current user's business. No client component writes to the DB directly.
 - **The service-role key never ships to the browser** and is only used (much later, if
@@ -401,7 +417,7 @@ create table invoice_payments (
 
 **Sales vs. invoices (important product decision):** they are separate modules.
 **Sales** = money received now (counter/POS-style). **Invoices** = billed to a customer,
-paid later. The P&L uses *cash basis* (§3.7), so nothing is double counted. See §11.
+paid later. The P&L uses _cash basis_ (§3.7), so nothing is double counted. See §11.
 
 ### 3.6 Numbering
 
@@ -458,15 +474,15 @@ businesses 1──< counters
 
 Cardinality and cascade rules:
 
-| Parent → Child                    | On delete            | Rationale                                          |
-| --------------------------------- | -------------------- | -------------------------------------------------- |
-| auth.users → profile, members     | CASCADE              | Account deletion removes identity links.            |
-| businesses → everything           | CASCADE              | "Delete my business" is a hard wipe (Settings).     |
-| customers → sales                 | SET NULL             | History survives customer deletion.                 |
-| customers → invoices              | RESTRICT             | Never delete a customer with invoices; void first.  |
-| products → sale/invoice items     | SET NULL             | Line items keep their description/price.            |
-| sales → sale_items, movements     | CASCADE              | Voiding/deleting a sale cleans its lines & stock.   |
-| invoices → invoice_items/payments | CASCADE              | Deleting a draft invoice cleans children.           |
+| Parent → Child                    | On delete | Rationale                                          |
+| --------------------------------- | --------- | -------------------------------------------------- |
+| auth.users → profile, members     | CASCADE   | Account deletion removes identity links.           |
+| businesses → everything           | CASCADE   | "Delete my business" is a hard wipe (Settings).    |
+| customers → sales                 | SET NULL  | History survives customer deletion.                |
+| customers → invoices              | RESTRICT  | Never delete a customer with invoices; void first. |
+| products → sale/invoice items     | SET NULL  | Line items keep their description/price.           |
+| sales → sale_items, movements     | CASCADE   | Voiding/deleting a sale cleans its lines & stock.  |
+| invoices → invoice_items/payments | CASCADE   | Deleting a draft invoice cleans children.          |
 
 Key derived relationships (computed, not stored):
 
@@ -480,11 +496,11 @@ Key derived relationships (computed, not stored):
 
 ### 5.1 Methods (MVP)
 
-| Method                     | Notes                                                        |
-| -------------------------- | ------------------------------------------------------------ |
-| Email + password           | Default. Email confirmation ON in prod, OFF in dev.          |
-| Magic link (email)         | One-tap sign-in for non-technical owners.                    |
-| Google OAuth               | PKCE flow via `/auth/callback`; huge conversion win.         |
+| Method             | Notes                                                |
+| ------------------ | ---------------------------------------------------- |
+| Email + password   | Default. Email confirmation ON in prod, OFF in dev.  |
+| Magic link (email) | One-tap sign-in for non-technical owners.            |
+| Google OAuth       | PKCE flow via `/auth/callback`; huge conversion win. |
 
 ### 5.2 Session handling (Next.js + Supabase)
 
@@ -500,7 +516,7 @@ app/auth/callback/route.ts  exchanges the PKCE code → session, then redirects
 - Sessions live in **httpOnly cookies** managed by `@supabase/ssr` with automatic
   refresh-token rotation. No localStorage tokens.
 - `middleware.ts` runs on all `(app)` routes: refresh session → redirect unauthenticated
-  users to `/login`. This is a *UX* guard; **authorization is always enforced by RLS**,
+  users to `/login`. This is a _UX_ guard; **authorization is always enforced by RLS**,
   not by middleware.
 - Helper `requireUser()` / `requireBusiness()` in `lib/server/auth.ts`:
   1. create server client from cookies,
@@ -529,7 +545,7 @@ Postgres itself refuses any row the user's business doesn't own.**
 ### 6.1 Baseline
 
 - RLS **enabled and forced** on every table (including `counters` = deny-all).
-- Supabase `anon`/publishable key is safe to ship to the browser *because* of RLS.
+- Supabase `anon`/publishable key is safe to ship to the browser _because_ of RLS.
 - `service_role` key: server env var only, used only for account-deletion admin call
   (and later Stripe webhooks). Never imported in client code — enforced by code review
   and a lint rule (`no-restricted-imports`).
@@ -723,11 +739,11 @@ Rules enforced by convention + ESLint boundaries:
 
 Next.js gives us three primitives; we use each where it's strongest:
 
-| Primitive             | Used for                                            |
-| --------------------- | --------------------------------------------------- |
+| Primitive             | Used for                                                                                                                                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Server Components** | All reads: lists, detail pages, dashboard, reports. Data fetched server-side with the user's session → RLS applies → zero client fetch code. |
-| **Server Actions**    | All mutations: create/update/delete, onboarding, record payment. Progressive enhancement; forms work without custom fetch plumbing. |
-| **Route Handlers**    | Only cross-service endpoints: `/auth/callback` and (later) `/api/webhooks/stripe`. |
+| **Server Actions**    | All mutations: create/update/delete, onboarding, record payment. Progressive enhancement; forms work without custom fetch plumbing.          |
+| **Route Handlers**    | Only cross-service endpoints: `/auth/callback` and (later) `/api/webhooks/stripe`.                                                           |
 
 This avoids building/serializing/maintaining a parallel API layer for features that have
 exactly one consumer (our own UI). When a public API is ever needed, it can be added as
@@ -783,23 +799,23 @@ CRUD (products, customers, expenses) uses plain multi-step inserts.
 
 Each phase ends with a deployable, demo-able increment on a Vercel preview URL.
 
-| # | Phase | Scope | Exit criteria (demo) | Est. |
-|---|-------|-------|----------------------|------|
-| 0 | **Foundations** | Next.js 16 + TS strict + Tailwind v4 + shadcn/ui scaffold; Supabase project + CLI migrations wired; env vars; ESLint/Prettier; CI (lint + typecheck); deploy pipeline to Vercel | Empty app deployed; `supabase db push` works from CI | 1–2 d |
-| 1 | **Auth & onboarding** | Signup/login (email + Google), magic link, callback route, middleware guards, profile trigger, onboarding wizard creating business + owner membership + default categories | New user can sign up, create "Acme Shop", land on empty dashboard; second user cannot see Acme data (RLS verified) | 2–3 d |
-| 2 | **App shell & dashboard v1** | Sidebar/topbar layout, nav, empty states, dashboard KPI cards reading real (empty) queries, money/date formatting utilities | Responsive shell; dashboard renders zeros gracefully | 2 d |
-| 3 | **Products & inventory** | Product CRUD, stock fields, manual stock adjustment + `stock_movements` history view, low-stock badge | Add 5 products, adjust stock, see history | 2–3 d |
-| 4 | **Customers** | Customer CRUD, search, detail page with placeholder tabs | Add/search customers | 1–2 d |
-| 5 | **Sales** | Multi-line sale form (product picker + free text), server-computed totals/tax/discount, `create_sale` transactional RPC (number, items, stock decrement, movements), sales list/detail, void sale | Full sale flow end-to-end; stock decrements; dashboard KPIs update | 3–4 d |
-| 6 | **Expenses** | Category management, expense CRUD with date/amount/vendor, receipt photo upload to Storage | Record expenses with receipts | 2 d |
-| 7 | **Invoices** | Invoice CRUD (customer required, items, due date), numbering, status machine, record-payment flow + trigger, overdue computation, customer "balance owed" | Draft → sent → partially paid → paid lifecycle works | 3–4 d |
-| 8 | **Reports & dashboard v2** | P&L SQL function (cash basis), range picker (month/last month/YTD/custom), expense breakdown by category, simple trend chart; dashboard: revenue/expenses/profit, low-stock list, overdue invoices, recent activity | P&L matches hand-computed numbers from demo data | 2–3 d |
-| 9 | **Settings & hardening** | Business profile edit, tax rate, invoice/sale prefixes, change password, delete business/account; global polish (loading, errors, a11y pass, mobile); seed script | Settings all work; Lighthouse/a11y pass on key pages | 2–3 d |
-| 10 | **Launch prep** | Custom domain, prod Supabase project, envs, backup/PITR check, Playwright smoke suite green, README + runbook | Live at production URL, monitored | 1 d |
+| #   | Phase                        | Scope                                                                                                                                                                                                               | Exit criteria (demo)                                                                                               | Est.  |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----- |
+| 0   | **Foundations**              | Next.js 16 + TS strict + Tailwind v4 + shadcn/ui scaffold; Supabase project + CLI migrations wired; env vars; ESLint/Prettier; CI (lint + typecheck); deploy pipeline to Vercel                                     | Empty app deployed; `supabase db push` works from CI                                                               | 1–2 d |
+| 1   | **Auth & onboarding**        | Signup/login (email + Google), magic link, callback route, middleware guards, profile trigger, onboarding wizard creating business + owner membership + default categories                                          | New user can sign up, create "Acme Shop", land on empty dashboard; second user cannot see Acme data (RLS verified) | 2–3 d |
+| 2   | **App shell & dashboard v1** | Sidebar/topbar layout, nav, empty states, dashboard KPI cards reading real (empty) queries, money/date formatting utilities                                                                                         | Responsive shell; dashboard renders zeros gracefully                                                               | 2 d   |
+| 3   | **Products & inventory**     | Product CRUD, stock fields, manual stock adjustment + `stock_movements` history view, low-stock badge                                                                                                               | Add 5 products, adjust stock, see history                                                                          | 2–3 d |
+| 4   | **Customers**                | Customer CRUD, search, detail page with placeholder tabs                                                                                                                                                            | Add/search customers                                                                                               | 1–2 d |
+| 5   | **Sales**                    | Multi-line sale form (product picker + free text), server-computed totals/tax/discount, `create_sale` transactional RPC (number, items, stock decrement, movements), sales list/detail, void sale                   | Full sale flow end-to-end; stock decrements; dashboard KPIs update                                                 | 3–4 d |
+| 6   | **Expenses**                 | Category management, expense CRUD with date/amount/vendor, receipt photo upload to Storage                                                                                                                          | Record expenses with receipts                                                                                      | 2 d   |
+| 7   | **Invoices**                 | Invoice CRUD (customer required, items, due date), numbering, status machine, record-payment flow + trigger, overdue computation, customer "balance owed"                                                           | Draft → sent → partially paid → paid lifecycle works                                                               | 3–4 d |
+| 8   | **Reports & dashboard v2**   | P&L SQL function (cash basis), range picker (month/last month/YTD/custom), expense breakdown by category, simple trend chart; dashboard: revenue/expenses/profit, low-stock list, overdue invoices, recent activity | P&L matches hand-computed numbers from demo data                                                                   | 2–3 d |
+| 9   | **Settings & hardening**     | Business profile edit, tax rate, invoice/sale prefixes, change password, delete business/account; global polish (loading, errors, a11y pass, mobile); seed script                                                   | Settings all work; Lighthouse/a11y pass on key pages                                                               | 2–3 d |
+| 10  | **Launch prep**              | Custom domain, prod Supabase project, envs, backup/PITR check, Playwright smoke suite green, README + runbook                                                                                                       | Live at production URL, monitored                                                                                  | 1 d   |
 
 **Total: ~3.5–5 weeks** for one developer. Phases 3–7 are parallelizable if two devs.
 
-Definition of done per phase: typed + linted, RLS policies added in the *same migration*
+Definition of done per phase: typed + linted, RLS policies added in the _same migration_
 as the table, empty/loading/error states present, works on mobile, deployed to preview.
 
 ---
@@ -811,11 +827,11 @@ Checkout + Customer Portal do the heavy lifting; we only mirror subscription sta
 
 ### 10.1 Plans (proposed)
 
-| Plan   | Price            | Limits / features                                                        |
-| ------ | ---------------- | ------------------------------------------------------------------------ |
-| Free   | $0               | 1 business, 1 user, 50 products, 100 sales + 20 invoices / month, core reports |
-| Pro    | ~$19/mo, $190/yr | Unlimited records, PDF invoice export, expense reports export (CSV), priority support |
-| Team *(v2)* | ~$39/mo     | Everything + 5 team members (uses the already-present `members` table)   |
+| Plan        | Price            | Limits / features                                                                     |
+| ----------- | ---------------- | ------------------------------------------------------------------------------------- |
+| Free        | $0               | 1 business, 1 user, 50 products, 100 sales + 20 invoices / month, core reports        |
+| Pro         | ~$19/mo, $190/yr | Unlimited records, PDF invoice export, expense reports export (CSV), priority support |
+| Team _(v2)_ | ~$39/mo          | Everything + 5 team members (uses the already-present `members` table)                |
 
 Limits live in one `PLANS` constant (`lib/server/pricing.ts`) — single source of truth
 for both the marketing page and enforcement checks.
@@ -863,8 +879,8 @@ Webhooks handled: `checkout.session.completed`, `customer.subscription.created|u
 ### 10.4 Enforcement pattern
 
 ```ts
-const sub = await getSubscription(business.id);     // cached per-request
-assertPlanAllows(sub, 'products', { count: currentCount });  // throws → friendly upsell error
+const sub = await getSubscription(business.id); // cached per-request
+assertPlanAllows(sub, "products", { count: currentCount }); // throws → friendly upsell error
 ```
 
 Enforced in Server Actions (server-side, can't be bypassed), with a shared
