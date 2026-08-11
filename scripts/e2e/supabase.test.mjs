@@ -124,6 +124,28 @@ async function main() {
   console.log(`\nBusiness OS E2E — Supabase: ${SUPABASE_URL}`);
   console.log(`Business OS E2E — App:      ${APP_URL}\n`);
 
+  // -------------------------------------------------------------------------
+  // Preflight: can this machine reach the Supabase project at all?
+  // Sandboxed CI environments often restrict outbound network to an allowlist;
+  // detect that up front instead of producing misleading per-test failures.
+  // -------------------------------------------------------------------------
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    console.error(
+      `PREFLIGHT FAILED — cannot reach ${SUPABASE_URL}\n` +
+        `  cause: ${err?.cause?.code ?? err?.message ?? err}\n\n` +
+        "This is a network/environment problem, not an application failure.\n" +
+        "  - Sandboxed environments: ask for *.supabase.co to be added to the\n" +
+        "    egress allowlist, then re-run this script.\n" +
+        "  - Local machines: check your internet connection / firewall.\n",
+    );
+    process.exit(2);
+  }
+
   let ownerSession = null;
   let outsiderSession = null;
   let newbieSession = null;
